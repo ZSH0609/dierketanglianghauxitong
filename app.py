@@ -13,9 +13,7 @@ CLASS_LIST = [
 
 # ==========================
 # 核心配置：加分/扣分两大模块 + 一级分类 + 二级小项
-# 每个小项：名称、默认分值、上限、下限
 # ==========================
-# 加分项目全量配置（对照学校第二课堂管理办法）
 ADD_SCORE_CONFIG = {
     "思想政治与综合素养类": [
         {"name": "思想品德类荣誉（国家级）", "default": 30.0, "max": 30.0, "min": 0.0},
@@ -109,7 +107,6 @@ ADD_SCORE_CONFIG = {
     ]
 }
 
-# 扣分项目全量配置（对照学校基础管理量表）
 DEDUCT_SCORE_CONFIG = {
     "思想政治表现": [
         {"name": "未完成理论学习任务", "default": -2.0, "max": 0.0, "min": -10.0},
@@ -156,7 +153,6 @@ DEDUCT_SCORE_CONFIG = {
     ]
 }
 
-# 一级分类列表（用于总览展示）
 ADD_CATEGORIES = list(ADD_SCORE_CONFIG.keys())
 DEDUCT_CATEGORIES = list(DEDUCT_SCORE_CONFIG.keys())
 
@@ -200,9 +196,15 @@ def init_data():
 
     if "score_records" not in st.session_state:
         st.session_state.score_records = []
+    
+    # 初始化提交确认状态
+    if "confirm_submit" not in st.session_state:
+        st.session_state.confirm_submit = False
+    if "pending_data" not in st.session_state:
+        st.session_state.pending_data = None
 
 # ==========================
-# 工具函数：计算学生某小项累计分
+# 工具函数
 # ==========================
 def get_student_item_total(stu_id, top_type, category, item_name):
     total = 0.0
@@ -214,9 +216,6 @@ def get_student_item_total(stu_id, top_type, category, item_name):
             total += r["分数值"]
     return total
 
-# ==========================
-# 工具函数：学分汇总表
-# ==========================
 def calc_score_summary():
     summary = {}
     for record in st.session_state.score_records:
@@ -277,7 +276,7 @@ def login_page():
 # 退出登录
 # ==========================
 def logout():
-    for key in ["login_status", "username", "user_name", "user_role", "belong_class"]:
+    for key in ["login_status", "username", "user_name", "user_role", "belong_class", "confirm_submit", "pending_data"]:
         if key in st.session_state:
             del st.session_state[key]
     st.rerun()
@@ -373,11 +372,11 @@ def user_manage_page():
                 st.rerun()
 
 # ==========================
-# 2. 学分录入（核心：加/扣分离 + 三级联动 + 批量 + 自定义 + 超限提醒）
+# 2. 学分录入（修复版）
 # ==========================
 def score_input_page():
     st.title("✏️ 学分录入")
-    st.caption("加分/扣分双模块，三级分类联动，支持批量操作与自定义项目")
+    st.caption("加分/扣分双模块，三级分类联动，必填项校验，超限强制提醒")
     st.divider()
 
     user_role = st.session_state.user_role
@@ -385,10 +384,15 @@ def score_input_page():
 
     # 班级权限控制
     if user_role == "super_admin":
-        select_class = st.selectbox("选择操作班级", CLASS_LIST)
+        select_class = st.selectbox("选择操作班级", ["请选择班级"] + CLASS_LIST)
     else:
         select_class = belong_class
         st.info(f"您当前仅可操作：{belong_class}")
+
+    # 班级未选中时不显示后续内容
+    if select_class == "请选择班级":
+        st.info("请先选择操作班级")
+        return
 
     # 筛选对应班级学生
     class_students = [
@@ -401,20 +405,26 @@ def score_input_page():
         st.warning("该班级暂无学生账号，请先在「用户管理」中添加")
         return
 
-    # ========== 三级分类选择 ==========
+    # ========== 三级分类选择（默认全为空） ==========
     col1, col2, col3 = st.columns(3)
     with col1:
-        top_type = st.selectbox("操作类型", ["加分", "扣分"])
+        top_type = st.selectbox("操作类型", ["请选择操作类型", "加分", "扣分"])
+        if top_type == "请选择操作类型":
+            st.stop()
         config = ADD_SCORE_CONFIG if top_type == "加分" else DEDUCT_SCORE_CONFIG
         category_list = list(config.keys())
     
     with col2:
-        selected_category = st.selectbox("选择一级分类", category_list)
+        selected_category = st.selectbox("选择一级分类", ["请选择一级分类"] + category_list)
+        if selected_category == "请选择一级分类":
+            st.stop()
         item_list = config[selected_category]
         item_names = [item["name"] for item in item_list]
     
     with col3:
-        selected_item_name = st.selectbox("选择具体项目", item_names)
+        selected_item_name = st.selectbox("选择具体项目", ["请选择具体项目"] + item_names)
+        if selected_item_name == "请选择具体项目":
+            st.stop()
         selected_item = next(item for item in item_list if item["name"] == selected_item_name)
         default_score = selected_item["default"]
         max_score = selected_item["max"]
@@ -423,77 +433,113 @@ def score_input_page():
     # 自定义项目输入框
     custom_item_name = ""
     if selected_item_name == "其他（自定义）":
-        custom_item_name = st.text_input("请输入自定义项目名称", placeholder="例如：班级临时任务加分")
+        custom_item_name = st.text_input("* 请输入自定义项目名称", placeholder="例如：班级临时任务加分")
 
-    # ========== 分值与事由 ==========
+    # ========== 分值与事由（事由必填） ==========
     col4, col5 = st.columns(2)
     with col4:
+        # 输入框强制限制单次输入范围
         score_value = st.number_input(
             f"分数值（范围 {min_score} ~ {max_score}）",
+            min_value=float(min_score),
+            max_value=float(max_score),
             value=float(default_score),
             step=0.5,
             format="%.1f"
         )
     with col5:
-        reason = st.text_input("事由说明（如：2026年3月团日活动）")
+        reason = st.text_input("* 事由说明（必填）", placeholder="例如：2026年3月主题团日活动参与")
 
     # ========== 批量选择学生 ==========
     st.subheader("👥 选择操作学生（可多选）")
     student_options = [f"{name}（{uname}）" for uname, name in class_students]
     selected_students = st.multiselect(
         "勾选要操作的学生",
-        options=student_options,
-        default=student_options
+        options=student_options
     )
 
-    # ========== 提交校验与写入 ==========
-    if st.button("确认提交", type="primary", use_container_width=True):
-        if not selected_students:
-            st.error("请至少选择一名学生")
-        elif score_value == 0:
-            st.error("分数值不能为0")
-        elif selected_item_name == "其他（自定义）" and not custom_item_name.strip():
-            st.error("自定义项目请填写项目名称")
-        else:
-            final_item_name = custom_item_name.strip() if selected_item_name == "其他（自定义）" else selected_item_name
-            warning_list = []
-            success_count = 0
-
-            for opt in selected_students:
-                stu_id = opt.split("（")[1].replace("）", "")
-                stu_name = st.session_state.users[stu_id]["name"]
+    # ========== 预校验 + 确认提交逻辑 ==========
+    # 重置确认状态
+    if not st.session_state.confirm_submit:
+        if st.button("预校验并提交", type="primary", use_container_width=True):
+            # 1. 必填项校验
+            if not selected_students:
+                st.error("请至少选择一名学生")
+            elif not reason.strip():
+                st.error("事由说明为必填项，请填写后再提交")
+            elif selected_item_name == "其他（自定义）" and not custom_item_name.strip():
+                st.error("自定义项目请填写项目名称")
+            else:
+                # 2. 计算超限情况
+                final_item_name = custom_item_name.strip() if selected_item_name == "其他（自定义）" else selected_item_name
+                warning_list = []
                 
-                # 计算该学生该小项累计分
-                current_total = get_student_item_total(stu_id, top_type, selected_category, final_item_name)
-                new_total = current_total + score_value
+                for opt in selected_students:
+                    stu_id = opt.split("（")[1].replace("）", "")
+                    stu_name = st.session_state.users[stu_id]["name"]
+                    current_total = get_student_item_total(stu_id, top_type, selected_category, final_item_name)
+                    new_total = current_total + score_value
 
-                # 超限提醒（只提醒不拦截）
-                if top_type == "加分" and new_total > max_score:
-                    warning_list.append(f"⚠️ {stu_name}：「{final_item_name}」上限 {max_score} 分，提交后累计 {new_total:.1f} 分，已超出上限")
-                elif top_type == "扣分" and new_total < min_score:
-                    warning_list.append(f"⚠️ {stu_name}：「{final_item_name}」下限 {min_score} 分，提交后累计 {new_total:.1f} 分，已超出下限")
+                    if top_type == "加分" and new_total > max_score:
+                        warning_list.append(f"⚠️ {stu_name}：「{final_item_name}」上限 {max_score} 分，提交后累计 {new_total:.1f} 分，已超出上限")
+                    elif top_type == "扣分" and new_total < min_score:
+                        warning_list.append(f"⚠️ {stu_name}：「{final_item_name}」下限 {min_score} 分，提交后累计 {new_total:.1f} 分，已超出下限")
 
-                # 写入记录
-                st.session_state.score_records.append({
-                    "姓名": stu_name,
-                    "学号": stu_id,
-                    "所属班级": select_class,
-                    "操作类型": top_type,
-                    "一级分类": selected_category,
-                    "小项名称": final_item_name,
-                    "分数值": score_value,
-                    "事由": reason,
-                    "录入人": st.session_state.user_name,
-                    "录入时间": time.strftime("%Y-%m-%d %H:%M")
-                })
-                success_count += 1
+                # 3. 缓存待提交数据
+                st.session_state.pending_data = {
+                    "top_type": top_type,
+                    "category": selected_category,
+                    "item_name": final_item_name,
+                    "score_value": score_value,
+                    "reason": reason.strip(),
+                    "select_class": select_class,
+                    "selected_students": selected_students
+                }
 
-            # 结果反馈
-            st.success(f"操作成功，已为 {success_count} 名学生完成{top_type}")
-            if warning_list:
-                st.warning("以下学生已超出分数限制（仅提醒，已照常提交）：\n" + "\n".join(warning_list))
-            
-            st.rerun()
+                # 4. 显示警告并进入确认状态
+                if warning_list:
+                    st.warning("以下学生已超出该项目分数限制（仅提醒，确认后仍可提交）：\n" + "\n".join(warning_list))
+                st.session_state.confirm_submit = True
+                st.rerun()
+
+    # 确认提交阶段
+    else:
+        st.info("已完成校验，确认无误后点击下方按钮完成提交")
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("确认提交", type="primary", use_container_width=True):
+                data = st.session_state.pending_data
+                success_count = 0
+
+                for opt in data["selected_students"]:
+                    stu_id = opt.split("（")[1].replace("）", "")
+                    stu_name = st.session_state.users[stu_id]["name"]
+                    
+                    st.session_state.score_records.append({
+                        "姓名": stu_name,
+                        "学号": stu_id,
+                        "所属班级": data["select_class"],
+                        "操作类型": data["top_type"],
+                        "一级分类": data["category"],
+                        "小项名称": data["item_name"],
+                        "分数值": data["score_value"],
+                        "事由": data["reason"],
+                        "录入人": st.session_state.user_name,
+                        "录入时间": time.strftime("%Y-%m-%d %H:%M")
+                    })
+                    success_count += 1
+
+                st.success(f"操作成功，已为 {success_count} 名学生完成{data['top_type']}")
+                # 重置状态
+                st.session_state.confirm_submit = False
+                st.session_state.pending_data = None
+                st.rerun()
+        
+        with col_btn2:
+            if st.button("取消返回修改", use_container_width=True):
+                st.session_state.confirm_submit = False
+                st.session_state.pending_data = None
+                st.rerun()
 
 # ==========================
 # 3. 学分总览
@@ -528,7 +574,6 @@ def score_summary_page():
         filtered = [item for item in filtered if search_name in item["姓名"] or search_name in item["学号"]]
 
     if filtered:
-        # 列顺序：基本信息 → 加分各大类 → 加分合计 → 扣分各大类 → 扣分合计 → 最终净学分
         show_columns = ["姓名", "学号", "所属班级"] + ADD_CATEGORIES + ["加分合计"] + DEDUCT_CATEGORIES + ["扣分合计", "最终净学分"]
         st.dataframe(filtered, use_container_width=True, hide_index=True, column_order=show_columns)
     else:
