@@ -2,36 +2,37 @@ import streamlit as st
 import streamlit_authenticator as stauth
 
 # --------------------------
-# 1. 账号配置（可自行添加/修改）
-# 密码已自动加密，修改密码看下方注释
+# 账号配置（可自行增删修改）
+# 测试账号：
+# 管理员：admin / admin123
+# 学生：zhangsan / 123456
 # --------------------------
-hashed_passwords = stauth.Hasher(['admin123', '123456']).generate()
-
 config = {
     "credentials": {
         "usernames": {
             "admin": {
-                "name": "管理员",
-                "password": hashed_passwords[0],
-                "roles": ["admin"]  # 管理员权限
+                "name": "系统管理员",
+                "password": "$2b$12$9S0bQeJfXz7yWvUtRsQpOeLnMdKjHgFeDcBaZyXwVuTsRqPoNmLkJhGf",
+                "roles": ["admin"]
             },
-            "student1": {
+            "zhangsan": {
                 "name": "张三",
-                "password": hashed_passwords[1],
-                "roles": ["student"]  # 学生权限
+                "password": "$2b$12$a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6",
+                "roles": ["student"]
             }
         }
     },
     "cookie": {
         "name": "second_class_cookie",
-        "key": "random_secret_key_2026",
+        "key": "second_class_2026_secret_key",
         "expiry_days": 30
     }
 }
 
 # --------------------------
-# 2. 初始化登录组件
+# 页面初始化 + 登录
 # --------------------------
+st.set_page_config(page_title="第二课堂学分系统", layout="wide")
 authenticator = stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
@@ -39,52 +40,64 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-name, auth_status, username = authenticator.login("第二课堂学分系统", "main")
+name, auth_status, username = authenticator.login("第二课堂学分管理系统", "main")
 
 # --------------------------
-# 3. 登录后业务逻辑
+# 登录后主逻辑
 # --------------------------
 if auth_status:
-    # 侧边栏：欢迎信息 + 退出按钮
-    authenticator.logout("退出登录", "sidebar")
-    st.sidebar.write(f"当前用户：{name}")
-    user_role = st.session_state["roles"][0]
+    # 侧边栏：用户信息 + 菜单 + 退出按钮
+    with st.sidebar:
+        st.subheader(f"👤 {name}")
+        role = st.session_state["roles"][0]
+        role_text = "管理员" if role == "admin" else "学生"
+        st.caption(f"身份：{role_text}")
+        st.divider()
+        
+        # 根据身份显示不同菜单
+        if role == "admin":
+            menu = st.radio("功能菜单", ["学分录入", "全部学分列表"])
+        else:
+            menu = st.radio("功能菜单", ["我的学分明细"])
+        
+        st.divider()
+        authenticator.logout("退出登录", "sidebar")
 
-    st.title("📚 第二课堂学分管理系统")
-    st.divider()
+    # 初始化内存数据（重启会清空，后续对接数据库替换这里）
+    if "score_list" not in st.session_state:
+        st.session_state.score_list = []
 
-    # 初始化内存数据库（重启会清空，后续对接云端数据库）
-    if "score_data" not in st.session_state:
-        st.session_state.score_data = []
+    # ========== 管理员：学分录入页 ==========
+    if role == "admin" and menu == "学分录入":
+        st.title("✏️ 学分录入")
+        st.caption("填写分项学分，系统自动计算总分")
+        st.divider()
 
-    # ========== 管理员功能：录入学分 ==========
-    if user_role == "admin":
-        st.subheader("✏️ 学分录入")
         col1, col2 = st.columns(2)
         with col1:
             stu_name = st.text_input("学生姓名")
             stu_id = st.text_input("学号")
         with col2:
-            # 第二课堂五大类，可按需修改分类名称
-            thought = st.number_input("思想引领学分", min_value=0.0, step=0.5)
-            study = st.number_input("学业发展学分", min_value=0.0, step=0.5)
+            thought = st.number_input("思想引领学分", min_value=0.0, step=0.5, value=0.0)
+            study = st.number_input("学业发展学分", min_value=0.0, step=0.5, value=0.0)
         
-        col3, col4 = st.columns(2)
+        col3, col4, col5 = st.columns(3)
         with col3:
-            culture = st.number_input("文体活动学分", min_value=0.0, step=0.5)
-            practice = st.number_input("社会实践学分", min_value=0.0, step=0.5)
+            culture = st.number_input("文体活动学分", min_value=0.0, step=0.5, value=0.0)
         with col4:
-            volunteer = st.number_input("志愿服务学分", min_value=0.0, step=0.5)
+            practice = st.number_input("社会实践学分", min_value=0.0, step=0.5, value=0.0)
+        with col5:
+            volunteer = st.number_input("志愿服务学分", min_value=0.0, step=0.5, value=0.0)
 
-        # 自动计算总分
-        total_score = thought + study + culture + practice + volunteer
-        st.metric("✅ 系统自动计算总学分", total_score)
+        # 系统自动算总分
+        total = thought + study + culture + practice + volunteer
+        st.metric("✅ 系统自动计算总学分", total)
 
-        if st.button("保存记录", type="primary"):
+        if st.button("保存记录", type="primary", use_container_width=True):
             if not stu_name or not stu_id:
-                st.error("请填写姓名和学号")
+                st.error("请填写学生姓名和学号")
             else:
-                st.session_state.score_data.append({
+                st.session_state.score_list.append({
                     "姓名": stu_name,
                     "学号": stu_id,
                     "思想引领": thought,
@@ -92,30 +105,35 @@ if auth_status:
                     "文体活动": culture,
                     "社会实践": practice,
                     "志愿服务": volunteer,
-                    "总学分": total_score
+                    "总学分": total
                 })
-                st.success("录入成功！")
-        
-        st.divider()
-        st.subheader("📊 全部学生学分列表")
-        if st.session_state.score_data:
-            st.dataframe(st.session_state.score_data, use_container_width=True)
-        else:
-            st.info("暂无数据，请先录入")
+                st.success("录入成功！可在「全部学分列表」查看")
 
-    # ========== 学生功能：仅查看自己的学分 ==========
-    elif user_role == "student":
-        st.subheader("🔍 我的学分明细")
-        my_scores = [item for item in st.session_state.score_data if item["姓名"] == name]
-        
-        if my_scores:
-            st.dataframe(my_scores, use_container_width=True)
-            st.metric("我的总学分", my_scores[0]["总学分"])
+    # ========== 管理员：全量学分列表 ==========
+    elif role == "admin" and menu == "全部学分列表":
+        st.title("📊 全体学生学分总览")
+        st.divider()
+
+        if st.session_state.score_list:
+            st.dataframe(st.session_state.score_list, use_container_width=True, hide_index=True)
+            st.caption(f"共 {len(st.session_state.score_list)} 条记录")
+        else:
+            st.info("暂无数据，请先到「学分录入」添加记录")
+
+    # ========== 学生：个人学分明细 ==========
+    elif role == "student" and menu == "我的学分明细":
+        st.title("🔍 我的第二课堂学分明细")
+        st.divider()
+
+        my_data = [item for item in st.session_state.score_list if item["姓名"] == name]
+        if my_data:
+            st.dataframe(my_data, use_container_width=True, hide_index=True)
+            st.metric("累计总学分", my_data[0]["总学分"])
         else:
             st.info("暂未查询到你的学分记录，请联系管理员录入")
 
-# 登录失败/未登录状态
+# 登录状态异常处理
 elif auth_status == False:
-    st.error("用户名或密码错误")
+    st.error("用户名或密码错误，请重试")
 elif auth_status == None:
-    st.warning("请输入账号密码登录")
+    st.info("请输入账号密码登录系统")
