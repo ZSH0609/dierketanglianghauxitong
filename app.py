@@ -44,21 +44,28 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-# 核心修复：全部用关键字参数，彻底规避版本参数顺序问题
+# 适配0.3.x新版：用fields设置表单标题，不再用form_name
 name, authentication_status, username = authenticator.login(
-    form_name="第二课堂学分管理系统",
-    location="main"
+    location="main",
+    fields={
+        "Form name": "第二课堂学分管理系统",
+        "Username": "用户名",
+        "Password": "密码",
+        "Login": "登录"
+    }
 )
 
 # --------------------------
 # 登录后业务逻辑
 # --------------------------
 if authentication_status:
+    # 从配置里取角色，不依赖session_state，兼容性更强
+    user_info = config["credentials"]["usernames"].get(username, {})
+    role = user_info.get("roles", ["student"])[0]
+
     # 侧边栏信息
     with st.sidebar:
         st.subheader(f"👤 {name}")
-        # 兼容所有版本的角色获取
-        role = st.session_state.get("roles", ["student"])[0]
         role_text = "管理员" if role == "admin" else "学生"
         st.caption(f"身份：{role_text}")
         st.divider()
