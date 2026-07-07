@@ -2,7 +2,7 @@ import streamlit as st
 import time
 
 # ==========================
-# 基础配置：团支部班级列表、分数类型
+# 基础配置：团支部列表
 # ==========================
 CLASS_LIST = [
     "24级软工1班团支部",
@@ -11,21 +11,160 @@ CLASS_LIST = [
     "24级计科2班团支部"
 ]
 
-SCORE_TYPES = [
-    "思想引领",
-    "学业发展",
-    "文体活动",
-    "社会实践",
-    "志愿服务"
-]
+# ==========================
+# 核心配置：加分/扣分两大模块 + 一级分类 + 二级小项
+# 每个小项：名称、默认分值、上限、下限
+# ==========================
+# 加分项目全量配置（对照学校第二课堂管理办法）
+ADD_SCORE_CONFIG = {
+    "思想政治与综合素养类": [
+        {"name": "思想品德类荣誉（国家级）", "default": 30.0, "max": 30.0, "min": 0.0},
+        {"name": "思想品德类荣誉（省级）", "default": 20.0, "max": 30.0, "min": 0.0},
+        {"name": "思想品德类荣誉（校级）", "default": 10.0, "max": 30.0, "min": 0.0},
+        {"name": "好人好事表彰（国家级）", "default": 20.0, "max": 30.0, "min": 0.0},
+        {"name": "好人好事表彰（省级）", "default": 15.0, "max": 30.0, "min": 0.0},
+        {"name": "好人好事表彰（校级）", "default": 10.0, "max": 30.0, "min": 0.0},
+        {"name": "网络理论学习/知识竞赛", "default": 0.5, "max": 10.0, "min": 0.0},
+        {"name": "青马工程/国学班（国家级）", "default": 30.0, "max": 30.0, "min": 0.0},
+        {"name": "青马工程/国学班（省级）", "default": 20.0, "max": 30.0, "min": 0.0},
+        {"name": "青马工程/铁军先锋团（校级）", "default": 12.0, "max": 30.0, "min": 0.0},
+        {"name": "青马工程/骨干班（院级）", "default": 8.0, "max": 30.0, "min": 0.0},
+        {"name": "军训标兵（校级）", "default": 8.0, "max": 8.0, "min": 0.0},
+        {"name": "军训标兵（院级）", "default": 5.0, "max": 8.0, "min": 0.0},
+        {"name": "主题团日/班会（发言）", "default": 2.0, "max": 15.0, "min": 0.0},
+        {"name": "主题团日/班会（观众）", "default": 0.5, "max": 15.0, "min": 0.0},
+        {"name": "个人综合性荣誉（国家级）", "default": 25.0, "max": 25.0, "min": 0.0},
+        {"name": "个人综合性荣誉（省级）", "default": 15.0, "max": 25.0, "min": 0.0},
+        {"name": "个人综合性荣誉（校级）", "default": 8.0, "max": 25.0, "min": 0.0},
+        {"name": "个人综合性荣誉（院级）", "default": 5.0, "max": 25.0, "min": 0.0},
+        {"name": "集体综合性荣誉（负责人·国家级）", "default": 20.0, "max": 20.0, "min": 0.0},
+        {"name": "集体综合性荣誉（成员·国家级）", "default": 10.0, "max": 20.0, "min": 0.0},
+        {"name": "集体综合性荣誉（负责人·省级）", "default": 10.0, "max": 20.0, "min": 0.0},
+        {"name": "集体综合性荣誉（成员·省级）", "default": 5.0, "max": 20.0, "min": 0.0},
+        {"name": "其他（自定义）", "default": 1.0, "max": 100.0, "min": 0.0}
+    ],
+    "社会实践与志愿服务类": [
+        {"name": "三下乡重点队（国家级）", "default": 12.0, "max": 25.0, "min": 0.0},
+        {"name": "三下乡重点队（省级）", "default": 9.0, "max": 25.0, "min": 0.0},
+        {"name": "三下乡重点队（校级）", "default": 5.0, "max": 25.0, "min": 0.0},
+        {"name": "三下乡普通实践队", "default": 2.0, "max": 25.0, "min": 0.0},
+        {"name": "返家乡实践（表彰·省级）", "default": 12.0, "max": 20.0, "min": 0.0},
+        {"name": "返家乡实践（表彰·校级）", "default": 8.0, "max": 20.0, "min": 0.0},
+        {"name": "返家乡实践（参与）", "default": 1.0, "max": 5.0, "min": 0.0},
+        {"name": "调研报告（团队）", "default": 5.0, "max": 15.0, "min": 0.0},
+        {"name": "调研报告（个人）", "default": 10.0, "max": 15.0, "min": 0.0},
+        {"name": "校内志愿活动（2小时）", "default": 1.0, "max": 30.0, "min": 0.0},
+        {"name": "无偿献血", "default": 2.0, "max": 30.0, "min": 0.0},
+        {"name": "朋辈导师（优秀）", "default": 10.0, "max": 10.0, "min": 0.0},
+        {"name": "朋辈导师（良好）", "default": 8.0, "max": 10.0, "min": 0.0},
+        {"name": "朋辈导师（合格）", "default": 6.0, "max": 10.0, "min": 0.0},
+        {"name": "学生干部（优秀）", "default": 18.0, "max": 30.0, "min": 0.0},
+        {"name": "学生干部（良好）", "default": 13.0, "max": 30.0, "min": 0.0},
+        {"name": "学生干部（合格）", "default": 8.0, "max": 30.0, "min": 0.0},
+        {"name": "信息员（优秀）", "default": 8.0, "max": 10.0, "min": 0.0},
+        {"name": "信息员（良好）", "default": 7.0, "max": 10.0, "min": 0.0},
+        {"name": "信息员（合格）", "default": 6.0, "max": 10.0, "min": 0.0},
+        {"name": "其他（自定义）", "default": 1.0, "max": 100.0, "min": 0.0}
+    ],
+    "科研创新与学科竞赛类": [
+        {"name": "普刊学术论文（一作）", "default": 10.0, "max": 30.0, "min": 0.0},
+        {"name": "核心期刊论文（一作）", "default": 30.0, "max": 100.0, "min": 0.0},
+        {"name": "挑战杯/互联网+（国奖）", "default": 40.0, "max": 100.0, "min": 0.0},
+        {"name": "挑战杯/互联网+（省奖）", "default": 25.0, "max": 100.0, "min": 0.0},
+        {"name": "挑战杯/互联网+（校奖）", "default": 12.0, "max": 30.0, "min": 0.0},
+        {"name": "大创项目（国家级结项）", "default": 30.0, "max": 30.0, "min": 0.0},
+        {"name": "大创项目（省级结项）", "default": 20.0, "max": 30.0, "min": 0.0},
+        {"name": "大创项目（校级结项）", "default": 10.0, "max": 30.0, "min": 0.0},
+        {"name": "发明专利（一作）", "default": 30.0, "max": 100.0, "min": 0.0},
+        {"name": "实用新型专利（一作）", "default": 20.0, "max": 100.0, "min": 0.0},
+        {"name": "软件著作权（一作）", "default": 20.0, "max": 100.0, "min": 0.0},
+        {"name": "学科竞赛（国家级A类）", "default": 40.0, "max": 100.0, "min": 0.0},
+        {"name": "学科竞赛（省级A类）", "default": 25.0, "max": 100.0, "min": 0.0},
+        {"name": "学科竞赛（校级）", "default": 8.0, "max": 40.0, "min": 0.0},
+        {"name": "计算机二级/英语四六级证书", "default": 8.0, "max": 50.0, "min": 0.0},
+        {"name": "职业资格证书（高级）", "default": 20.0, "max": 50.0, "min": 0.0},
+        {"name": "创办企业（法人）", "default": 15.0, "max": 30.0, "min": 0.0},
+        {"name": "创业培训合格证书", "default": 5.0, "max": 15.0, "min": 0.0},
+        {"name": "其他（自定义）", "default": 1.0, "max": 100.0, "min": 0.0}
+    ],
+    "文体艺术与身心发展类": [
+        {"name": "非思政类专题讲座（发言）", "default": 2.0, "max": 10.0, "min": 0.0},
+        {"name": "非思政类专题讲座（观众）", "default": 0.5, "max": 10.0, "min": 0.0},
+        {"name": "文艺比赛（国家级）", "default": 25.0, "max": 30.0, "min": 0.0},
+        {"name": "文艺比赛（省级）", "default": 12.0, "max": 30.0, "min": 0.0},
+        {"name": "文艺比赛（校级）", "default": 8.0, "max": 30.0, "min": 0.0},
+        {"name": "校级文艺演出（演职人员）", "default": 5.0, "max": 20.0, "min": 0.0},
+        {"name": "书院文艺活动（演职人员）", "default": 3.0, "max": 20.0, "min": 0.0},
+        {"name": "体育比赛（国家级）", "default": 25.0, "max": 100.0, "min": 0.0},
+        {"name": "体育比赛（省级）", "default": 12.0, "max": 50.0, "min": 0.0},
+        {"name": "体育比赛（校级）", "default": 6.0, "max": 30.0, "min": 0.0},
+        {"name": "运动会/篮球赛（参与）", "default": 3.0, "max": 30.0, "min": 0.0},
+        {"name": "趣味体育活动", "default": 1.0, "max": 10.0, "min": 0.0},
+        {"name": "心理类竞赛（校级）", "default": 8.0, "max": 30.0, "min": 0.0},
+        {"name": "演讲/辩论/征文比赛（校级）", "default": 6.0, "max": 30.0, "min": 0.0},
+        {"name": "社团活动参与", "default": 0.5, "max": 10.0, "min": 0.0},
+        {"name": "新闻宣传（校级媒体）", "default": 2.0, "max": 30.0, "min": 0.0},
+        {"name": "新闻宣传（省级媒体）", "default": 5.0, "max": 30.0, "min": 0.0},
+        {"name": "其他（自定义）", "default": 1.0, "max": 100.0, "min": 0.0}
+    ]
+}
+
+# 扣分项目全量配置（对照学校基础管理量表）
+DEDUCT_SCORE_CONFIG = {
+    "思想政治表现": [
+        {"name": "未完成理论学习任务", "default": -2.0, "max": 0.0, "min": -10.0},
+        {"name": "集体活动无故不到", "default": -3.0, "max": 0.0, "min": -10.0},
+        {"name": "集体活动迟到/早退", "default": -1.0, "max": 0.0, "min": -10.0},
+        {"name": "学生干部工作弄虚作假", "default": -5.0, "max": 0.0, "min": -30.0},
+        {"name": "违反民族宗教政策行为", "default": -20.0, "max": 0.0, "min": -100.0},
+        {"name": "其他（自定义）", "default": -1.0, "max": 0.0, "min": -100.0}
+    ],
+    "文明行为养成": [
+        {"name": "公开发表不当言论", "default": -10.0, "max": 0.0, "min": -15.0},
+        {"name": "公共场所不文明行为", "default": -5.0, "max": 0.0, "min": -10.0},
+        {"name": "宿舍卫生检查不合格", "default": -1.0, "max": 0.0, "min": -10.0},
+        {"name": "阻挠宿舍卫生检查", "default": -3.0, "max": 0.0, "min": -5.0},
+        {"name": "教室卫生未完成值日", "default": -1.0, "max": 0.0, "min": -5.0},
+        {"name": "其他（自定义）", "default": -1.0, "max": 0.0, "min": -100.0}
+    ],
+    "安全行为管理": [
+        {"name": "违反治安管理处罚法", "default": -50.0, "max": 0.0, "min": -100.0},
+        {"name": "校园欺凌", "default": -30.0, "max": 0.0, "min": -50.0},
+        {"name": "参与打架斗殴", "default": -20.0, "max": 0.0, "min": -50.0},
+        {"name": "校内酗酒", "default": -20.0, "max": 0.0, "min": -50.0},
+        {"name": "违规使用大功率电器", "default": -15.0, "max": 0.0, "min": -30.0},
+        {"name": "私拉乱接电源", "default": -10.0, "max": 0.0, "min": -30.0},
+        {"name": "损坏消防设施", "default": -20.0, "max": 0.0, "min": -50.0},
+        {"name": "不参加消防培训演训", "default": -5.0, "max": 0.0, "min": -10.0},
+        {"name": "其他（自定义）", "default": -1.0, "max": 0.0, "min": -100.0}
+    ],
+    "校规校纪遵守": [
+        {"name": "教学考勤迟到/早退", "default": -1.0, "max": 0.0, "min": -20.0},
+        {"name": "教学考勤旷课", "default": -3.0, "max": 0.0, "min": -50.0},
+        {"name": "周末晚点名无故不到", "default": -1.0, "max": 0.0, "min": -10.0},
+        {"name": "宿舍晚归", "default": -3.0, "max": 0.0, "min": -20.0},
+        {"name": "宿舍夜不归宿", "default": -10.0, "max": 0.0, "min": -20.0},
+        {"name": "会议活动迟到/早退", "default": -1.0, "max": 0.0, "min": -10.0},
+        {"name": "会议活动缺勤", "default": -3.0, "max": 0.0, "min": -10.0},
+        {"name": "书院通报批评", "default": -8.0, "max": 0.0, "min": -20.0},
+        {"name": "学校通报批评", "default": -10.0, "max": 0.0, "min": -30.0},
+        {"name": "警告处分", "default": -15.0, "max": 0.0, "min": -50.0},
+        {"name": "严重警告处分", "default": -20.0, "max": 0.0, "min": -50.0},
+        {"name": "记过处分", "default": -25.0, "max": 0.0, "min": -50.0},
+        {"name": "留校察看处分", "default": -50.0, "max": 0.0, "min": -100.0},
+        {"name": "其他（自定义）", "default": -1.0, "max": 0.0, "min": -100.0}
+    ]
+}
+
+# 一级分类列表（用于总览展示）
+ADD_CATEGORIES = list(ADD_SCORE_CONFIG.keys())
+DEDUCT_CATEGORIES = list(DEDUCT_SCORE_CONFIG.keys())
 
 # ==========================
-# 初始化系统数据（首次运行自动加载）
+# 初始化系统数据
 # ==========================
 def init_data():
     if "users" not in st.session_state:
-        # 用户表格式：用户名: {name, password, role, belong_class}
-        # role: super_admin(超级管理员) / class_admin(团支部管理员) / student(学生)
         st.session_state.users = {
             "superadmin": {
                 "name": "系统管理员",
@@ -50,15 +189,33 @@ def init_data():
                 "password": "123456",
                 "role": "student",
                 "belong_class": "24级软工1班团支部"
+            },
+            "student3": {
+                "name": "王五",
+                "password": "123456",
+                "role": "student",
+                "belong_class": "24级软工1班团支部"
             }
         }
 
     if "score_records" not in st.session_state:
-        # 加分记录表：每条记录包含学生信息、分数类型、加分值、事由、时间
         st.session_state.score_records = []
 
 # ==========================
-# 工具函数：计算学生学分汇总
+# 工具函数：计算学生某小项累计分
+# ==========================
+def get_student_item_total(stu_id, top_type, category, item_name):
+    total = 0.0
+    for r in st.session_state.score_records:
+        if (r["学号"] == stu_id 
+            and r["操作类型"] == top_type 
+            and r["一级分类"] == category 
+            and r["小项名称"] == item_name):
+            total += r["分数值"]
+    return total
+
+# ==========================
+# 工具函数：学分汇总表
 # ==========================
 def calc_score_summary():
     summary = {}
@@ -69,11 +226,19 @@ def calc_score_summary():
                 "姓名": record["姓名"],
                 "学号": record["学号"],
                 "所属班级": record["所属班级"],
-                **{t: 0.0 for t in SCORE_TYPES},
-                "最终总学分": 0.0
+                **{c: 0.0 for c in ADD_CATEGORIES},
+                "加分合计": 0.0,
+                **{c: 0.0 for c in DEDUCT_CATEGORIES},
+                "扣分合计": 0.0,
+                "最终净学分": 0.0
             }
-        summary[stu_id][record["分数类型"]] += record["加分值"]
-        summary[stu_id]["最终总学分"] += record["加分值"]
+        if record["操作类型"] == "加分":
+            summary[stu_id][record["一级分类"]] += record["分数值"]
+            summary[stu_id]["加分合计"] += record["分数值"]
+        else:
+            summary[stu_id][record["一级分类"]] += record["分数值"]
+            summary[stu_id]["扣分合计"] += record["分数值"]
+        summary[stu_id]["最终净学分"] = summary[stu_id]["加分合计"] + summary[stu_id]["扣分合计"]
     return list(summary.values())
 
 # ==========================
@@ -81,7 +246,7 @@ def calc_score_summary():
 # ==========================
 def login_page():
     st.markdown("<h1 style='text-align: center;'>🏫 第二课堂学分管理系统</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #666;'>书院团支部量化学分管理平台</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666;'>洛阳师范学院 · 书院综合素质量化平台</p>", unsafe_allow_html=True)
     st.divider()
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -118,14 +283,13 @@ def logout():
     st.rerun()
 
 # ==========================
-# 1. 超级管理员：用户管理页面
+# 1. 用户权限管理
 # ==========================
 def user_manage_page():
     st.title("👥 用户权限管理")
     st.caption("新增、编辑、删除用户，分配管辖班级与角色权限")
     st.divider()
 
-    # 新增用户区域
     with st.expander("➕ 新增用户", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
@@ -152,7 +316,6 @@ def user_manage_page():
                 st.success("用户新增成功")
                 st.rerun()
 
-    # 用户列表
     st.subheader("📋 全部用户列表")
     users = st.session_state.users
     user_list = []
@@ -171,7 +334,6 @@ def user_manage_page():
     
     st.dataframe(user_list, use_container_width=True, hide_index=True)
 
-    # 编辑/删除用户
     st.divider()
     st.subheader("✏️ 编辑/删除用户")
     edit_username = st.selectbox("选择要操作的用户名", [u for u in users.keys() if u != "superadmin"])
@@ -211,24 +373,24 @@ def user_manage_page():
                 st.rerun()
 
 # ==========================
-# 2. 学分录入页面
+# 2. 学分录入（核心：加/扣分离 + 三级联动 + 批量 + 自定义 + 超限提醒）
 # ==========================
 def score_input_page():
     st.title("✏️ 学分录入")
-    st.caption("选择学生与分数类型，系统自动累计分类总分与最终总学分")
+    st.caption("加分/扣分双模块，三级分类联动，支持批量操作与自定义项目")
     st.divider()
 
     user_role = st.session_state.user_role
     belong_class = st.session_state.belong_class
 
-    # 权限控制：班级管理员只能选本班学生
+    # 班级权限控制
     if user_role == "super_admin":
-        select_class = st.selectbox("选择班级", CLASS_LIST)
+        select_class = st.selectbox("选择操作班级", CLASS_LIST)
     else:
         select_class = belong_class
         st.info(f"您当前仅可操作：{belong_class}")
 
-    # 筛选出对应班级的学生
+    # 筛选对应班级学生
     class_students = [
         (uname, info["name"])
         for uname, info in st.session_state.users.items()
@@ -239,46 +401,112 @@ def score_input_page():
         st.warning("该班级暂无学生账号，请先在「用户管理」中添加")
         return
 
-    col1, col2 = st.columns(2)
+    # ========== 三级分类选择 ==========
+    col1, col2, col3 = st.columns(3)
     with col1:
-        student_option = st.selectbox("选择学生", [f"{name}（{uname}）" for uname, name in class_students])
-        stu_id = student_option.split("（")[1].replace("）", "")
-        stu_name = st.session_state.users[stu_id]["name"]
-        score_type = st.selectbox("分数类型", SCORE_TYPES)
+        top_type = st.selectbox("操作类型", ["加分", "扣分"])
+        config = ADD_SCORE_CONFIG if top_type == "加分" else DEDUCT_SCORE_CONFIG
+        category_list = list(config.keys())
+    
     with col2:
-        score_value = st.number_input("加分值", min_value=0.0, step=0.5, value=0.5)
-        reason = st.text_input("加分事由（如：参加团日活动）")
+        selected_category = st.selectbox("选择一级分类", category_list)
+        item_list = config[selected_category]
+        item_names = [item["name"] for item in item_list]
+    
+    with col3:
+        selected_item_name = st.selectbox("选择具体项目", item_names)
+        selected_item = next(item for item in item_list if item["name"] == selected_item_name)
+        default_score = selected_item["default"]
+        max_score = selected_item["max"]
+        min_score = selected_item["min"]
 
-    if st.button("确认加分", type="primary", use_container_width=True):
-        if score_value <= 0:
-            st.error("加分值必须大于0")
+    # 自定义项目输入框
+    custom_item_name = ""
+    if selected_item_name == "其他（自定义）":
+        custom_item_name = st.text_input("请输入自定义项目名称", placeholder="例如：班级临时任务加分")
+
+    # ========== 分值与事由 ==========
+    col4, col5 = st.columns(2)
+    with col4:
+        score_value = st.number_input(
+            f"分数值（范围 {min_score} ~ {max_score}）",
+            value=float(default_score),
+            step=0.5,
+            format="%.1f"
+        )
+    with col5:
+        reason = st.text_input("事由说明（如：2026年3月团日活动）")
+
+    # ========== 批量选择学生 ==========
+    st.subheader("👥 选择操作学生（可多选）")
+    student_options = [f"{name}（{uname}）" for uname, name in class_students]
+    selected_students = st.multiselect(
+        "勾选要操作的学生",
+        options=student_options,
+        default=student_options
+    )
+
+    # ========== 提交校验与写入 ==========
+    if st.button("确认提交", type="primary", use_container_width=True):
+        if not selected_students:
+            st.error("请至少选择一名学生")
+        elif score_value == 0:
+            st.error("分数值不能为0")
+        elif selected_item_name == "其他（自定义）" and not custom_item_name.strip():
+            st.error("自定义项目请填写项目名称")
         else:
-            st.session_state.score_records.append({
-                "姓名": stu_name,
-                "学号": stu_id,
-                "所属班级": select_class,
-                "分数类型": score_type,
-                "加分值": score_value,
-                "加分事由": reason,
-                "录入人": st.session_state.user_name,
-                "录入时间": time.strftime("%Y-%m-%d %H:%M")
-            })
-            st.success(f"已为 {stu_name} 成功加 {score_value} 分")
+            final_item_name = custom_item_name.strip() if selected_item_name == "其他（自定义）" else selected_item_name
+            warning_list = []
+            success_count = 0
+
+            for opt in selected_students:
+                stu_id = opt.split("（")[1].replace("）", "")
+                stu_name = st.session_state.users[stu_id]["name"]
+                
+                # 计算该学生该小项累计分
+                current_total = get_student_item_total(stu_id, top_type, selected_category, final_item_name)
+                new_total = current_total + score_value
+
+                # 超限提醒（只提醒不拦截）
+                if top_type == "加分" and new_total > max_score:
+                    warning_list.append(f"⚠️ {stu_name}：「{final_item_name}」上限 {max_score} 分，提交后累计 {new_total:.1f} 分，已超出上限")
+                elif top_type == "扣分" and new_total < min_score:
+                    warning_list.append(f"⚠️ {stu_name}：「{final_item_name}」下限 {min_score} 分，提交后累计 {new_total:.1f} 分，已超出下限")
+
+                # 写入记录
+                st.session_state.score_records.append({
+                    "姓名": stu_name,
+                    "学号": stu_id,
+                    "所属班级": select_class,
+                    "操作类型": top_type,
+                    "一级分类": selected_category,
+                    "小项名称": final_item_name,
+                    "分数值": score_value,
+                    "事由": reason,
+                    "录入人": st.session_state.user_name,
+                    "录入时间": time.strftime("%Y-%m-%d %H:%M")
+                })
+                success_count += 1
+
+            # 结果反馈
+            st.success(f"操作成功，已为 {success_count} 名学生完成{top_type}")
+            if warning_list:
+                st.warning("以下学生已超出分数限制（仅提醒，已照常提交）：\n" + "\n".join(warning_list))
+            
             st.rerun()
 
 # ==========================
-# 3. 学分总览页面（带筛选）
+# 3. 学分总览
 # ==========================
 def score_summary_page():
     st.title("📊 学分总览")
-    st.caption("按班级筛选，自动展示各分类总分与最终总学分")
+    st.caption("按班级筛选，自动展示各分类总分、加扣分合计与最终净学分")
     st.divider()
 
     user_role = st.session_state.user_role
     belong_class = st.session_state.belong_class
     summary = calc_score_summary()
 
-    # 筛选区域
     col1, col2, col3 = st.columns(3)
     with col1:
         if user_role == "super_admin":
@@ -293,7 +521,6 @@ def score_summary_page():
         st.write("")
         st.caption(f"共 {len(summary)} 名学生")
 
-    # 应用筛选
     filtered = summary
     if filter_class != "全部":
         filtered = [item for item in filtered if item["所属班级"] == filter_class]
@@ -301,24 +528,23 @@ def score_summary_page():
         filtered = [item for item in filtered if search_name in item["姓名"] or search_name in item["学号"]]
 
     if filtered:
-        # 调整列顺序：基本信息在前，分类总分在中间，最终总分在最后
-        show_columns = ["姓名", "学号", "所属班级"] + SCORE_TYPES + ["最终总学分"]
+        # 列顺序：基本信息 → 加分各大类 → 加分合计 → 扣分各大类 → 扣分合计 → 最终净学分
+        show_columns = ["姓名", "学号", "所属班级"] + ADD_CATEGORIES + ["加分合计"] + DEDUCT_CATEGORIES + ["扣分合计", "最终净学分"]
         st.dataframe(filtered, use_container_width=True, hide_index=True, column_order=show_columns)
     else:
         st.info("暂无符合条件的数据")
 
 # ==========================
-# 4. 加分记录明细页面
+# 4. 加扣分记录明细
 # ==========================
 def score_records_page():
-    st.title("📝 加分记录明细")
+    st.title("📝 加扣分记录明细")
     st.divider()
 
     user_role = st.session_state.user_role
     belong_class = st.session_state.belong_class
     records = st.session_state.score_records
 
-    # 筛选
     col1, col2, col3 = st.columns(3)
     with col1:
         if user_role == "super_admin":
@@ -326,24 +552,23 @@ def score_records_page():
         else:
             filter_class = belong_class
     with col2:
-        filter_type = st.selectbox("筛选分数类型", ["全部"] + SCORE_TYPES)
+        filter_type = st.selectbox("筛选操作类型", ["全部", "加分", "扣分"])
     with col3:
         search_name = st.text_input("搜索学生姓名")
 
-    # 应用筛选
     filtered = records
     if filter_class != "全部":
         filtered = [r for r in filtered if r["所属班级"] == filter_class]
     if filter_type != "全部":
-        filtered = [r for r in filtered if r["分数类型"] == filter_type]
+        filtered = [r for r in filtered if r["操作类型"] == filter_type]
     if search_name:
         filtered = [r for r in filtered if search_name in r["姓名"]]
 
     if filtered:
         st.dataframe(filtered, use_container_width=True, hide_index=True)
-        st.caption(f"共 {len(filtered)} 条加分记录")
+        st.caption(f"共 {len(filtered)} 条记录")
     else:
-        st.info("暂无加分记录")
+        st.info("暂无记录")
 
 # ==========================
 # 5. 学生个人页面
@@ -354,32 +579,30 @@ def student_my_page():
 
     my_id = st.session_state.username
     my_name = st.session_state.user_name
-    my_class = st.session_state.belong_class
 
     st.subheader("📈 学分汇总")
     summary = calc_score_summary()
     my_summary = [item for item in summary if item["学号"] == my_id]
     
     if my_summary:
-        show_columns = ["姓名", "学号", "所属班级"] + SCORE_TYPES + ["最终总学分"]
+        show_columns = ["姓名", "学号", "所属班级"] + ADD_CATEGORIES + ["加分合计"] + DEDUCT_CATEGORIES + ["扣分合计", "最终净学分"]
         st.dataframe(my_summary, use_container_width=True, hide_index=True, column_order=show_columns)
-        st.metric("累计总学分", my_summary[0]["最终总学分"])
+        st.metric("最终净学分", my_summary[0]["最终净学分"])
     else:
-        st.info("暂无加分记录")
+        st.info("暂无加扣分记录")
 
     st.divider()
-    st.subheader("📝 我的加分明细")
+    st.subheader("📝 我的加扣分明细")
     my_records = [r for r in st.session_state.score_records if r["学号"] == my_id]
     if my_records:
         st.dataframe(my_records, use_container_width=True, hide_index=True)
     else:
-        st.info("暂无加分记录")
+        st.info("暂无记录")
 
 # ==========================
 # 主页面入口
 # ==========================
 def main_page():
-    # 侧边栏
     with st.sidebar:
         st.subheader(f"👤 {st.session_state.user_name}")
         role_text = {
@@ -392,20 +615,19 @@ def main_page():
             st.caption(f"班级：{st.session_state.belong_class}")
         st.divider()
 
-        # 按角色显示菜单
         role = st.session_state.user_role
         if role == "super_admin":
             menu = st.radio("功能菜单", [
                 "用户权限管理",
                 "学分录入",
                 "学分总览",
-                "加分记录明细"
+                "加扣分记录明细"
             ])
         elif role == "class_admin":
             menu = st.radio("功能菜单", [
                 "学分录入",
                 "学分总览",
-                "加分记录明细"
+                "加扣分记录明细"
             ])
         else:
             menu = st.radio("功能菜单", [
@@ -416,14 +638,13 @@ def main_page():
         if st.button("退出登录", use_container_width=True):
             logout()
 
-    # 页面路由
     if menu == "用户权限管理":
         user_manage_page()
     elif menu == "学分录入":
         score_input_page()
     elif menu == "学分总览":
         score_summary_page()
-    elif menu == "加分记录明细":
+    elif menu == "加扣分记录明细":
         score_records_page()
     elif menu == "我的学分":
         student_my_page()
