@@ -7,17 +7,19 @@ import streamlit_authenticator as stauth
 # 管理员：用户名 admin  密码 admin123
 # 学生：  用户名 zhangsan  密码 123456
 # --------------------------
+hashed_pw = stauth.Hasher(['admin123', '123456']).generate()
+
 config = {
     "credentials": {
         "usernames": {
             "admin": {
                 "name": "系统管理员",
-                "password": "$2b$12$iZ7xQ8yP9wV2s3aD4fG5hJ6kL7mN8bV9cX0zA1sD2fG3hJ4kL5mN6",
+                "password": hashed_pw[0],
                 "roles": ["admin"]
             },
             "zhangsan": {
                 "name": "张三",
-                "password": "$2b$12$pO0iU9yT8rE7wQ6eR5tY4uI3oP2aS1dF0gH9jK8lM7nN6bV5cX4zS3d",
+                "password": hashed_pw[1],
                 "roles": ["student"]
             }
         }
@@ -42,7 +44,7 @@ authenticator = stauth.Authenticate(
     config["cookie"]["expiry_days"]
 )
 
-# 登录入口（用关键字参数传参，避免版本兼容问题）
+# 核心修复：全部用关键字参数，彻底规避版本参数顺序问题
 name, authentication_status, username = authenticator.login(
     form_name="第二课堂学分管理系统",
     location="main"
@@ -55,7 +57,8 @@ if authentication_status:
     # 侧边栏信息
     with st.sidebar:
         st.subheader(f"👤 {name}")
-        role = st.session_state["roles"][0]
+        # 兼容所有版本的角色获取
+        role = st.session_state.get("roles", ["student"])[0]
         role_text = "管理员" if role == "admin" else "学生"
         st.caption(f"身份：{role_text}")
         st.divider()
